@@ -1,97 +1,31 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Mapa</title>
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
   <style>
-    html,
-    body {
-      margin: 0;
-      height: 100%;
-    }
-
-    body {
-      display: flex;
-      font: 14px system-ui, sans-serif;
-    }
-
-    #menu {
-      width: 260px;
-      flex: none;
-      overflow-y: auto;
-      box-sizing: border-box;
-      padding: 12px;
-      background: #fff;
-      border-right: 1px solid #ddd;
-    }
-
-    #menu h1 {
-      font-size: 15px;
-      margin: 0 0 10px;
-    }
-
-    .item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 6px 4px;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-
-    .item:hover {
-      background: #f1f5f9;
-    }
-
-    .sw {
-      width: 12px;
-      height: 12px;
-      border-radius: 3px;
-      flex: none;
-      opacity: .8;
-    }
-
-    .nom {
-      flex: 1;
-    }
-
-    .est {
-      color: #64748b;
-      font-size: 12px;
-    }
-
-    .est.err {
-      color: #dc2626;
-    }
-
-    #map {
-      flex: 1;
-      min-width: 0;
-      min-height: 0;
-    }
-
-    .maplibregl-popup-content {
-      font: 13px/1.5 system-ui, sans-serif;
-    }
-
+    html, body { margin: 0; height: 100%; }
+    body { display: flex; font: 14px system-ui, sans-serif; }
+    #menu { width: 260px; flex: none; overflow-y: auto; box-sizing: border-box;
+            padding: 12px; background: #fff; border-right: 1px solid #ddd; }
+    #menu h1 { font-size: 15px; margin: 0 0 10px; }
+    .item { display: flex; align-items: center; gap: 8px; padding: 6px 4px;
+            border-radius: 4px; cursor: pointer; }
+    .item:hover { background: #f1f5f9; }
+    .sw { width: 12px; height: 12px; border-radius: 3px; flex: none; opacity: .8; }
+    .nom { flex: 1; }
+    .est { color: #64748b; font-size: 12px; }
+    .est.err { color: #dc2626; }
+    #map { flex: 1; min-width: 0; min-height: 0; }
+    .maplibregl-popup-content { font: 13px/1.5 system-ui, sans-serif; }
     @media (max-width: 600px) {
-      body {
-        flex-direction: column;
-      }
-
-      #menu {
-        width: auto;
-        max-height: 35%;
-        border-right: 0;
-        border-bottom: 1px solid #ddd;
-      }
+      body { flex-direction: column; }
+      #menu { width: auto; max-height: 35%; border-right: 0; border-bottom: 1px solid #ddd; }
     }
   </style>
 </head>
-
 <body>
   <aside id="menu">
     <h1>Capas</h1>
@@ -123,10 +57,8 @@
       style: {
         version: 8,
         sources: {
-          osm: {
-            type: "raster", tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-            tileSize: 256, attribution: "© OpenStreetMap"
-          }
+          osm: { type: "raster", tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+                 tileSize: 256, attribution: "© OpenStreetMap" }
         },
         layers: [{ id: "osm", type: "raster", source: "osm" }]
       }
@@ -168,34 +100,27 @@
       else { activas.delete(k); setHover(null); tooltip.remove(); }
     }
 
-    // Respeta el orden del menú: las capas con "orden" mayor quedan encima
-    function siguienteCapa(i) {
+    // Orden de apilado: primero todos los polígonos, luego las líneas y arriba los puntos.
+    // Dentro de cada grupo se respeta "orden" (mayor = más arriba).
+    function antesDe(i, sufijo, ancla) {
       for (let j = i + 1; j < items.length; j++) {
-        const id = `${items[j].key}-relleno`;
+        const id = `${items[j].key}-${sufijo}`;
         if (map.getLayer(id)) return id;
       }
-      return undefined;
+      return ancla;
     }
 
     function agregarCapa(item, i, geojson) {
-      const k = item.key, c = item.color, antes = siguienteCapa(i);
+      const k = item.key, c = item.color;
       const h = ["boolean", ["feature-state", "hover"], false];
       map.addSource(k, { type: "geojson", data: geojson, generateId: true });
-      map.addLayer({
-        id: `${k}-relleno`, type: "fill", source: k, filter: ["==", "$type", "Polygon"],
-        paint: { "fill-color": c, "fill-opacity": ["case", h, 0.65, 0.3] }
-      }, antes);
-      map.addLayer({
-        id: `${k}-lineas`, type: "line", source: k, filter: ["in", "$type", "Polygon", "LineString"],
-        paint: { "line-color": c, "line-width": ["case", h, 3, 1.5] }
-      }, antes);
-      map.addLayer({
-        id: `${k}-puntos`, type: "circle", source: k, filter: ["==", "$type", "Point"],
-        paint: {
-          "circle-radius": ["case", h, 9, 6], "circle-color": c,
-          "circle-stroke-width": 2, "circle-stroke-color": "#ffffff"
-        }
-      }, antes);
+      map.addLayer({ id: `${k}-relleno`, type: "fill", source: k, filter: ["==", "$type", "Polygon"],
+        paint: { "fill-color": c, "fill-opacity": ["case", h, 0.65, 0.3] } }, antesDe(i, "relleno", "ancla-lineas"));
+      map.addLayer({ id: `${k}-lineas`, type: "line", source: k, filter: ["in", "$type", "Polygon", "LineString"],
+        paint: { "line-color": c, "line-width": ["case", h, 3, 1.5] } }, antesDe(i, "lineas", "ancla-puntos"));
+      map.addLayer({ id: `${k}-puntos`, type: "circle", source: k, filter: ["==", "$type", "Point"],
+        paint: { "circle-radius": ["case", h, 9, 6], "circle-color": c,
+                 "circle-stroke-width": 2, "circle-stroke-color": "#ffffff" } }, antesDe(i, "puntos", undefined));
     }
 
     async function alternar(item, i, cb, est) {
@@ -251,11 +176,16 @@
     });
 
     map.on("load", async () => {
+      // Capas invisibles que marcan dónde termina cada grupo (polígonos / líneas)
+      ["ancla-lineas", "ancla-puntos"].forEach(id =>
+        map.addLayer({ id, type: "background", layout: { visibility: "none" } }));
+
       const lista = document.getElementById("lista");
       try {
         const res = await fetch(`${API_BASE}/get_lyr_menu`);
         if (!res.ok) throw new Error("La API respondió " + res.status);
         items = await res.json();
+        //console.log(items)
       } catch (e) {
         lista.textContent = "No se pudo cargar el menú: " + e.message;
         return;
@@ -287,5 +217,4 @@
     });
   </script>
 </body>
-
 </html>
