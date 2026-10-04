@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mapa de puntos</title>
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+  <style>
+    html, body { margin: 0; height: 100%; }
+    #map { position: absolute; inset: 0; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script>
+    //const API_BASE = "http://127.0.0.1:5000";
+    const API_BASE = "https://gis-app-ch1.onrender.com"
+
+    const CAPA_POR_DEFECTO = "pts_test";
+    const CAPA = new URLSearchParams(location.search).get("capa") || CAPA_POR_DEFECTO;
+
+    const PUNTOS_PRUEBA = {
+      type: "FeatureCollection",
+      features: [
+        { type: "Feature", properties: { nombre: "Punto 1" }, geometry: { type: "Point", coordinates: [-72.59, -38.74] } },
+        { type: "Feature", properties: { nombre: "Punto 2" }, geometry: { type: "Point", coordinates: [-72.62, -38.72] } },
+        { type: "Feature", properties: { nombre: "Punto 3" }, geometry: { type: "Point", coordinates: [-72.55, -38.76] } }
+      ]
+    };
+
+    // Acepta un FeatureCollection, o la lista de filas {id, geom} que
+    // devolverá el endpoint /puntos (geom viene como texto GeoJSON).
+    function aFeatureCollection(data) {
+      if (data.type === "FeatureCollection") return data;
+      return {
+        type: "FeatureCollection",
+        features: data.map(f => ({
+          type: "Feature",
+          properties: { id: f.id },
+          geometry: typeof f.geom === "string" ? JSON.parse(f.geom) : f.geom
+        }))
+      };
+    }
+
+    async function cargarPuntos() {
+      if (!API_BASE) return PUNTOS_PRUEBA;
+      const res = await fetch(`${API_BASE}/capas/${encodeURIComponent(CAPA)}`);
+      if (res.status === 404) throw new Error(`La capa "${CAPA}" no está disponible en la API`);
+      if (!res.ok) throw new Error("La API respondió " + res.status);
+      return aFeatureCollection(await res.json());
+    }
+
+    const map = new maplibregl.Map({
+      container: "map",
+      center: [-72.59, -38.74],
+      zoom: 11,
+      style: {
+        version: 8,
+        sources: {
+          osm: {
+            type: "raster",
+            tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+            tileSize: 256,
+            attribution: "© OpenStreetMap"
+          }
+        },
+        layers: [{ id: "osm", type: "raster", source: "osm" }]
+      }
+    });
+    map.addControl(new maplibregl.NavigationControl());
+
+    map.on("load", async () => {
+      let datos;
+      try {
+        datos = await cargarPuntos();
+      } catch (e) {
+        console.error(e);
+        alert("No se pudieron cargar los puntos: " + e.message);
+        return;
+      }
+
+      map.addSource("puntos", { type: "geojson", data: datos });
+      map.addLayer({
+        id: "puntos",
+        type: "circle",
+        source: "puntos",
+        paint: {
+          "circle-radius": 7,
+          "circle-color": "#d62828",
+          "circle-stroke-width": 2,
+          "circle-stroke-color": "#ffffff"
+        }
+      });
+
+      // Ajusta el mapa para que se vean todos los puntos
+      const bounds = new maplibregl.LngLatBounds();
+      datos.features.forEach(f => bounds.extend(f.geometry.coordinates));
+      if (!bounds.isEmpty()) map.fitBounds(bounds, { padding: 60, maxZoom: 15 });
+
+      // Popup al hacer clic
+      map.on("click", "puntos", e => {
+        const p = e.features[0].properties;
+        const html = Object.entries(p).map(([k, v]) => `<b>${k}:</b> ${v}`).join("<br>");
+        new maplibregl.Popup().setLngLat(e.lngLat).setHTML(html).addTo(map);
+      });
+      map.on("mouseenter", "puntos", () => map.getCanvas().style.cursor = "pointer");
+      map.on("mouseleave", "puntos", () => map.getCanvas().style.cursor = "");
+    });
+  </script>
+</body>
+</html>
