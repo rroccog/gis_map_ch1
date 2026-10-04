@@ -1,17 +1,102 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Mapa</title>
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
   <style>
-    html, body { margin: 0; height: 100%; }
-    #map { position: absolute; inset: 0; }
-    .maplibregl-popup-content { font: 13px/1.5 system-ui, sans-serif; }
+    html,
+    body {
+      margin: 0;
+      height: 100%;
+    }
+
+    body {
+      display: flex;
+      font: 14px system-ui, sans-serif;
+    }
+
+    #menu {
+      width: 260px;
+      flex: none;
+      overflow-y: auto;
+      box-sizing: border-box;
+      padding: 12px;
+      background: #fff;
+      border-right: 1px solid #ddd;
+    }
+
+    #menu h1 {
+      font-size: 15px;
+      margin: 0 0 10px;
+    }
+
+    .item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 4px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .item:hover {
+      background: #f1f5f9;
+    }
+
+    .sw {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      flex: none;
+      opacity: .8;
+    }
+
+    .nom {
+      flex: 1;
+    }
+
+    .est {
+      color: #64748b;
+      font-size: 12px;
+    }
+
+    .est.err {
+      color: #dc2626;
+    }
+
+    #map {
+      flex: 1;
+      min-width: 0;
+      min-height: 0;
+    }
+
+    .maplibregl-popup-content {
+      font: 13px/1.5 system-ui, sans-serif;
+    }
+
+    @media (max-width: 600px) {
+      body {
+        flex-direction: column;
+      }
+
+      #menu {
+        width: auto;
+        max-height: 35%;
+        border-right: 0;
+        border-bottom: 1px solid #ddd;
+      }
+    }
   </style>
 </head>
+
 <body>
+  <aside id="menu">
+    <h1>Capas</h1>
+    <div id="lista">Cargando…</div>
+  </aside>
   <div id="map"></div>
 
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
@@ -20,20 +105,12 @@
     //const API_BASE = "http://127.0.0.1:5000";
     const API_BASE = "https://gis-app-ch1.onrender.com"
 
-    // Capa por defecto; se cambia con index.html?capa=nombre
-    const CAPA_POR_DEFECTO = "Uso_Actual";
-    const CAPA = new URLSearchParams(location.search).get("capa") || CAPA_POR_DEFECTO;
-
-    // Propiedad que se muestra al pasar el mouse (si la capa no la tiene, no sale nada)
-    const CAMPO_ETIQUETA = "Uso_actual";
-
-    const COLOR = "#2563eb";
-    const CAPAS_INTERACTIVAS = ["relleno", "lineas", "puntos"];
+    const PALETA = ["#2563eb", "#16a34a", "#d97706", "#9333ea", "#dc2626", "#0891b2", "#be185d", "#65a30d"];
+    const SUFIJOS = ["relleno", "lineas", "puntos"];
 
     const esc = v => String(v).replace(/[&<>"']/g, c =>
       ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-    // Recorre las coordenadas de cualquier geometría para calcular los límites
     function extender(coords, b) {
       if (typeof coords[0] === "number") b.extend(coords);
       else coords.forEach(c => extender(c, b));
@@ -47,10 +124,8 @@
         version: 8,
         sources: {
           osm: {
-            type: "raster",
-            tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-            tileSize: 256,
-            attribution: "© OpenStreetMap"
+            type: "raster", tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+            tileSize: 256, attribution: "© OpenStreetMap"
           }
         },
         layers: [{ id: "osm", type: "raster", source: "osm" }]
@@ -58,80 +133,159 @@
     });
     map.addControl(new maplibregl.NavigationControl());
 
-    let hoverId = null;
-    function setHover(id) {
-      if (hoverId !== null) map.setFeatureState({ source: "capa", id: hoverId }, { hover: false });
-      hoverId = id;
-      if (id !== null) map.setFeatureState({ source: "capa", id }, { hover: true });
+    const cache = new Map();   // nombre de capa -> promesa con el GeoJSON (se descarga una sola vez)
+    const meta = {};           // key -> { capa, campo }
+    const activas = new Set(); // keys de las capas visibles
+    let items = [];
+    let hover = null;
+    const tooltip = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 12 });
+
+    function obtenerGeoJSON(item) {
+      if (!cache.has(item.capa)) {
+        const p = fetch(`${API_BASE}/capas/${encodeURIComponent(item.capa)}`).then(r => {
+          if (!r.ok) throw new Error(r.status === 404 ? "capa no disponible" : "API " + r.status);
+          return r.json();
+        });
+        p.catch(() => cache.delete(item.capa)); // si falla, se podrá reintentar
+        cache.set(item.capa, p);
+      }
+      return cache.get(item.capa);
     }
 
+    function setHover(source, id) {
+      if (hover) map.setFeatureState(hover, { hover: false });
+      hover = source ? { source, id } : null;
+      if (hover) map.setFeatureState(hover, { hover: true });
+    }
+
+    function idsActivos() {
+      return [...activas].flatMap(k => SUFIJOS.map(s => `${k}-${s}`));
+    }
+
+    function visible(k, v) {
+      SUFIJOS.forEach(s => map.setLayoutProperty(`${k}-${s}`, "visibility", v ? "visible" : "none"));
+      if (v) activas.add(k);
+      else { activas.delete(k); setHover(null); tooltip.remove(); }
+    }
+
+    // Respeta el orden del menú: las capas con "orden" mayor quedan encima
+    function siguienteCapa(i) {
+      for (let j = i + 1; j < items.length; j++) {
+        const id = `${items[j].key}-relleno`;
+        if (map.getLayer(id)) return id;
+      }
+      return undefined;
+    }
+
+    function agregarCapa(item, i, geojson) {
+      const k = item.key, c = item.color, antes = siguienteCapa(i);
+      const h = ["boolean", ["feature-state", "hover"], false];
+      map.addSource(k, { type: "geojson", data: geojson, generateId: true });
+      map.addLayer({
+        id: `${k}-relleno`, type: "fill", source: k, filter: ["==", "$type", "Polygon"],
+        paint: { "fill-color": c, "fill-opacity": ["case", h, 0.65, 0.3] }
+      }, antes);
+      map.addLayer({
+        id: `${k}-lineas`, type: "line", source: k, filter: ["in", "$type", "Polygon", "LineString"],
+        paint: { "line-color": c, "line-width": ["case", h, 3, 1.5] }
+      }, antes);
+      map.addLayer({
+        id: `${k}-puntos`, type: "circle", source: k, filter: ["==", "$type", "Point"],
+        paint: {
+          "circle-radius": ["case", h, 9, 6], "circle-color": c,
+          "circle-stroke-width": 2, "circle-stroke-color": "#ffffff"
+        }
+      }, antes);
+    }
+
+    async function alternar(item, i, cb, est) {
+      const k = item.key;
+      if (!cb.checked) { if (map.getSource(k)) visible(k, false); return; }
+
+      // Flag de "ya cargada": si la fuente existe en el mapa, solo se vuelve a mostrar
+      if (!map.getSource(k)) {
+        est.className = "est";
+        est.textContent = "cargando…";
+        try {
+          const gj = await obtenerGeoJSON(item);
+          if (!map.getSource(k)) {
+            agregarCapa(item, i, gj);
+            const b = new maplibregl.LngLatBounds();
+            gj.features.forEach(f => extender(f.geometry.coordinates, b));
+            if (cb.checked && !b.isEmpty()) map.fitBounds(b, { padding: 60, maxZoom: 16 });
+          }
+          est.textContent = "";
+        } catch (e) {
+          console.error(e);
+          cb.checked = false;
+          est.className = "est err";
+          est.textContent = e.message;
+          return;
+        }
+      }
+      visible(k, cb.checked);
+    }
+
+    map.on("mousemove", e => {
+      if (!activas.size) return;
+      const f = map.queryRenderedFeatures(e.point, { layers: idsActivos() })[0];
+      map.getCanvas().style.cursor = f ? "pointer" : "";
+      if (!f) { setHover(null); tooltip.remove(); return; }
+      if (!hover || hover.source !== f.source || hover.id !== f.id) setHover(f.source, f.id);
+      const campo = meta[f.source].campo;
+      const etiqueta = campo && f.properties[campo];
+      if (etiqueta) tooltip.setLngLat(e.lngLat).setHTML(`<b>${esc(etiqueta)}</b>`).addTo(map);
+      else tooltip.remove();
+    });
+    map.getCanvas().addEventListener("mouseleave", () => { setHover(null); tooltip.remove(); });
+
+    map.on("click", e => {
+      if (!activas.size) return;
+      const f = map.queryRenderedFeatures(e.point, { layers: idsActivos() })[0];
+      if (!f) return;
+      const filas = Object.entries(f.properties).map(([k, v]) => `<b>${esc(k)}:</b> ${esc(v)}`).join("<br>");
+      new maplibregl.Popup()
+        .setLngLat(e.lngLat)
+        .setHTML(`<b>${esc(meta[f.source].capa.replaceAll("_", " "))}</b><br>${filas}`)
+        .addTo(map);
+    });
+
     map.on("load", async () => {
-      let datos;
+      const lista = document.getElementById("lista");
       try {
-        const res = await fetch(`${API_BASE}/capas/${encodeURIComponent(CAPA)}`);
-        if (res.status === 404) throw new Error(`La capa "${CAPA}" no está disponible en la API`);
+        const res = await fetch(`${API_BASE}/get_lyr_menu`);
         if (!res.ok) throw new Error("La API respondió " + res.status);
-        datos = await res.json();
+        items = await res.json();
       } catch (e) {
-        console.error(e);
-        alert("No se pudo cargar la capa: " + e.message);
+        lista.textContent = "No se pudo cargar el menú: " + e.message;
         return;
       }
+      lista.textContent = items.length ? "" : "No hay capas activas";
 
-      // generateId asigna un id a cada entidad, necesario para el hover
-      map.addSource("capa", { type: "geojson", data: datos, generateId: true });
+      items.forEach((it, i) => {
+        it.key = `l${it.id}`;
+        it.color = PALETA[i % PALETA.length];
+        meta[it.key] = { capa: it.capa, campo: it.column_info };
 
-      const hover = ["boolean", ["feature-state", "hover"], false];
+        const label = document.createElement("label");
+        label.className = "item";
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        const sw = document.createElement("span");
+        sw.className = "sw";
+        sw.style.background = it.color;
+        const nom = document.createElement("span");
+        nom.className = "nom";
+        nom.textContent = it.capa.replaceAll("_", " ");
+        const est = document.createElement("small");
+        est.className = "est";
+        label.append(cb, sw, nom, est);
+        lista.append(label);
 
-      map.addLayer({
-        id: "relleno", type: "fill", source: "capa",
-        filter: ["==", "$type", "Polygon"],
-        paint: { "fill-color": COLOR, "fill-opacity": ["case", hover, 0.65, 0.3] }
-      });
-      map.addLayer({
-        id: "lineas", type: "line", source: "capa",
-        filter: ["in", "$type", "Polygon", "LineString"],
-        paint: { "line-color": COLOR, "line-width": ["case", hover, 3, 1.5] }
-      });
-      map.addLayer({
-        id: "puntos", type: "circle", source: "capa",
-        filter: ["==", "$type", "Point"],
-        paint: {
-          "circle-radius": ["case", hover, 9, 6],
-          "circle-color": "#d62828",
-          "circle-stroke-width": 2,
-          "circle-stroke-color": "#ffffff"
-        }
-      });
-
-      // Ajusta el mapa a toda la capa
-      const bounds = new maplibregl.LngLatBounds();
-      datos.features.forEach(f => extender(f.geometry.coordinates, bounds));
-      if (!bounds.isEmpty()) map.fitBounds(bounds, { padding: 60, maxZoom: 16 });
-
-      // Hover: resalta la entidad y muestra la etiqueta
-      const tooltip = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 12 });
-
-      map.on("mousemove", e => {
-        const f = map.queryRenderedFeatures(e.point, { layers: CAPAS_INTERACTIVAS })[0];
-        map.getCanvas().style.cursor = f ? "pointer" : "";
-        if (!f) { setHover(null); tooltip.remove(); return; }
-        if (f.id !== hoverId) setHover(f.id);
-        const etiqueta = CAMPO_ETIQUETA && f.properties[CAMPO_ETIQUETA];
-        if (etiqueta) tooltip.setLngLat(e.lngLat).setHTML(`<b>${esc(etiqueta)}</b>`).addTo(map);
-        else tooltip.remove();
-      });
-      map.getCanvas().addEventListener("mouseleave", () => { setHover(null); tooltip.remove(); });
-
-      // Clic: popup con todos los atributos
-      map.on("click", e => {
-        const f = map.queryRenderedFeatures(e.point, { layers: CAPAS_INTERACTIVAS })[0];
-        if (!f) return;
-        const filas = Object.entries(f.properties)
-          .map(([k, v]) => `<b>${esc(k)}:</b> ${esc(v)}`).join("<br>");
-        new maplibregl.Popup().setLngLat(e.lngLat).setHTML(filas).addTo(map);
+        cb.addEventListener("change", () => alternar(it, i, cb, est));
       });
     });
   </script>
 </body>
+
 </html>
