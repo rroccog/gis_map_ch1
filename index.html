@@ -69,6 +69,7 @@
     const meta = {};           // key -> { capa, campo }
     const activas = new Set(); // keys de las capas visibles
     let items = [];
+    let porZ = [];             // las mismas capas, ordenadas por zindex (orden de dibujo)
     let hover = null;
     const tooltip = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 12 });
 
@@ -100,30 +101,30 @@
       else { activas.delete(k); setHover(null); tooltip.remove(); }
     }
 
-    // Orden de apilado: primero todos los polígonos, luego las líneas y arriba los puntos.
-    // Dentro de cada grupo se respeta "orden" (mayor = más arriba).
-    function antesDe(i, sufijo, ancla) {
-      for (let j = i + 1; j < items.length; j++) {
-        const id = `${items[j].key}-${sufijo}`;
+    // Orden de dibujo según "zindex" (mayor = más arriba). El orden del menú es aparte ("orden").
+    // La capa nueva se inserta justo debajo de la siguiente capa con zindex mayor que ya esté en el mapa.
+    function antesDe(item) {
+      for (let j = porZ.indexOf(item) + 1; j < porZ.length; j++) {
+        const id = `${porZ[j].key}-relleno`;
         if (map.getLayer(id)) return id;
       }
-      return ancla;
+      return undefined;
     }
 
-    function agregarCapa(item, i, geojson) {
-      const k = item.key, c = item.color;
+    function agregarCapa(item, geojson) {
+      const k = item.key, c = item.color, antes = antesDe(item);
       const h = ["boolean", ["feature-state", "hover"], false];
       map.addSource(k, { type: "geojson", data: geojson, generateId: true });
       map.addLayer({ id: `${k}-relleno`, type: "fill", source: k, filter: ["==", "$type", "Polygon"],
-        paint: { "fill-color": c, "fill-opacity": ["case", h, 0.65, 0.3] } }, antesDe(i, "relleno", "ancla-lineas"));
+        paint: { "fill-color": c, "fill-opacity": ["case", h, 0.65, 0.3] } }, antes);
       map.addLayer({ id: `${k}-lineas`, type: "line", source: k, filter: ["in", "$type", "Polygon", "LineString"],
-        paint: { "line-color": c, "line-width": ["case", h, 3, 1.5] } }, antesDe(i, "lineas", "ancla-puntos"));
+        paint: { "line-color": c, "line-width": ["case", h, 3, 1.5] } }, antes);
       map.addLayer({ id: `${k}-puntos`, type: "circle", source: k, filter: ["==", "$type", "Point"],
         paint: { "circle-radius": ["case", h, 9, 6], "circle-color": c,
-                 "circle-stroke-width": 2, "circle-stroke-color": "#ffffff" } }, antesDe(i, "puntos", undefined));
+                 "circle-stroke-width": 2, "circle-stroke-color": "#ffffff" } }, antes);
     }
 
-    async function alternar(item, i, cb, est) {
+    async function alternar(item, cb, est) {
       const k = item.key;
       if (!cb.checked) { if (map.getSource(k)) visible(k, false); return; }
 
@@ -134,7 +135,7 @@
         try {
           const gj = await obtenerGeoJSON(item);
           if (!map.getSource(k)) {
-            agregarCapa(item, i, gj);
+            agregarCapa(item, gj);
             const b = new maplibregl.LngLatBounds();
             gj.features.forEach(f => extender(f.geometry.coordinates, b));
             if (cb.checked && !b.isEmpty()) map.fitBounds(b, { padding: 60, maxZoom: 16 });
@@ -176,21 +177,20 @@
     });
 
     map.on("load", async () => {
-      // Capas invisibles que marcan dónde termina cada grupo (polígonos / líneas)
-      ["ancla-lineas", "ancla-puntos"].forEach(id =>
-        map.addLayer({ id, type: "background", layout: { visibility: "none" } }));
-
       const lista = document.getElementById("lista");
       try {
         const res = await fetch(`${API_BASE}/get_lyr_menu`);
         if (!res.ok) throw new Error("La API respondió " + res.status);
         items = await res.json();
-        //console.log(items)
+        console.log(items)
       } catch (e) {
         lista.textContent = "No se pudo cargar el menú: " + e.message;
         return;
       }
       lista.textContent = items.length ? "" : "No hay capas activas";
+      // Si la fila no tiene zindex, se usa "orden" como respaldo
+      const z = it => it.z_index ?? it.orden ?? 0;
+      porZ = [...items].sort((a, b) => z(a) - z(b) || a.id - b.id);
 
       items.forEach((it, i) => {
         it.key = `l${it.id}`;
@@ -212,7 +212,7 @@
         label.append(cb, sw, nom, est);
         lista.append(label);
 
-        cb.addEventListener("change", () => alternar(it, i, cb, est));
+        cb.addEventListener("change", () => alternar(it, cb, est));
       });
     });
   </script>
