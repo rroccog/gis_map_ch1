@@ -1,31 +1,277 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Mapa</title>
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <style>
-    html, body { margin: 0; height: 100%; }
-    body { display: flex; font: 14px system-ui, sans-serif; }
-    #menu { width: 260px; flex: none; overflow-y: auto; box-sizing: border-box;
-            padding: 12px; background: #fff; border-right: 1px solid #ddd; }
-    #menu h1 { font-size: 15px; margin: 0 0 10px; }
-    .item { display: flex; align-items: center; gap: 8px; padding: 6px 4px;
-            border-radius: 4px; cursor: pointer; }
-    .item:hover { background: #f1f5f9; }
-    .sw { width: 12px; height: 12px; border-radius: 3px; flex: none; opacity: .8; }
-    .nom { flex: 1; }
-    .est { color: #64748b; font-size: 12px; }
-    .est.err { color: #dc2626; }
-    #map { flex: 1; min-width: 0; min-height: 0; }
-    .maplibregl-popup-content { font: 13px/1.5 system-ui, sans-serif; }
+    :root {
+      --bg: #212121;
+      --panel: #2b2b2b;
+      --line: #3c3c3c;
+      --text: #cfcfcf;
+      --muted: #8a8a8a;
+      --accent: #3d8fd1;
+      color-scheme: dark;
+    }
+
+    html,
+    body {
+      margin: 0;
+      height: 100%;
+    }
+
+    body {
+      display: flex;
+      font: 12px system-ui, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    #menu {
+      width: 280px;
+      flex: none;
+      overflow-y: auto;
+      box-sizing: border-box;
+      padding: 10px;
+      background: var(--panel);
+      border-right: 1px solid var(--line);
+      scrollbar-width: thin;
+      scrollbar-color: #4a4a4a transparent;
+    }
+
+    #menu h1 {
+      margin: 0 0 8px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 4px;
+      cursor: pointer;
+    }
+
+    .item:hover {
+      background: #333;
+    }
+
+    .item input {
+      margin: 0;
+      accent-color: var(--accent);
+    }
+
+    .sw {
+      width: 10px;
+      height: 10px;
+      flex: none;
+    }
+
+    .nom {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .est {
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .est.err {
+      color: #ff5c5c;
+    }
+
+    #map {
+      flex: 1;
+      min-width: 0;
+      min-height: 0;
+      background: #1a1a1a;
+    }
+
+    .fila {
+      display: flex;
+      align-items: center;
+    }
+
+    .fila .item {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .btn-f {
+      flex: none;
+      width: 26px;
+      height: 26px;
+      border: 0;
+      background: none;
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .btn-f:hover {
+      background: #3a3a3a;
+      color: var(--text);
+    }
+
+    .btn-f i {
+      font-size: 10px;
+      transition: transform .15s;
+    }
+
+    .btn-f.abierto i {
+      transform: rotate(90deg);
+    }
+
+    .filtro {
+      margin: 2px 0 8px 28px;
+      padding: 8px;
+      background: var(--bg);
+      border: 1px solid var(--line);
+    }
+
+    .filtro label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .filtro select,
+    .filtro input {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+      margin-top: 3px;
+      padding: 5px 6px;
+      background: #1a1a1a;
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 0;
+      font: 12px system-ui, "Segoe UI", sans-serif;
+    }
+
+    .filtro select:focus,
+    .filtro input:focus {
+      outline: 1px solid var(--accent);
+      outline-offset: -1px;
+    }
+
+    .filtro .botones {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .filtro .botones button {
+      flex: 1;
+      padding: 5px;
+      background: #333;
+      color: var(--text);
+      border: 1px solid #4a4a4a;
+      border-radius: 0;
+      font: 12px system-ui, "Segoe UI", sans-serif;
+      cursor: pointer;
+    }
+
+    .filtro .botones button:hover {
+      background: #3d3d3d;
+      border-color: var(--accent);
+    }
+
+    .filtro .res {
+      margin-top: 8px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    /* MapLibre en oscuro */
+    .maplibregl-popup-content {
+      padding: 8px 10px;
+      background: var(--panel);
+      color: var(--text);
+      border-radius: 0;
+      box-shadow: 0 0 0 1px #4a4a4a;
+      font: 12px/1.5 system-ui, "Segoe UI", sans-serif;
+    }
+
+    .maplibregl-popup-content b {
+      color: #fff;
+      font-weight: 600;
+    }
+
+    .maplibregl-popup-close-button {
+      color: var(--muted);
+    }
+
+    .maplibregl-popup-anchor-top .maplibregl-popup-tip,
+    .maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+    .maplibregl-popup-anchor-top-right .maplibregl-popup-tip {
+      border-bottom-color: var(--panel);
+    }
+
+    .maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
+    .maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+    .maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip {
+      border-top-color: var(--panel);
+    }
+
+    .maplibregl-popup-anchor-left .maplibregl-popup-tip {
+      border-right-color: var(--panel);
+    }
+
+    .maplibregl-popup-anchor-right .maplibregl-popup-tip {
+      border-left-color: var(--panel);
+    }
+
+    .maplibregl-ctrl-group {
+      background: var(--panel);
+      border-radius: 0;
+      box-shadow: 0 0 0 1px #4a4a4a;
+    }
+
+    .maplibregl-ctrl-group button+button {
+      border-top: 1px solid #4a4a4a;
+    }
+
+    .maplibregl-ctrl-group button .maplibregl-ctrl-icon {
+      filter: invert(1);
+    }
+
+    .maplibregl-ctrl-attrib {
+      background: rgba(33, 33, 33, .8) !important;
+      color: #999;
+    }
+
+    .maplibregl-ctrl-attrib a {
+      color: #aaa;
+    }
+
     @media (max-width: 600px) {
-      body { flex-direction: column; }
-      #menu { width: auto; max-height: 35%; border-right: 0; border-bottom: 1px solid #ddd; }
+      body {
+        flex-direction: column;
+      }
+
+      #menu {
+        width: auto;
+        max-height: 35%;
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
     }
   </style>
 </head>
+
 <body>
   <aside id="menu">
     <h1>Capas</h1>
@@ -39,8 +285,10 @@
     //const API_BASE = "http://127.0.0.1:5000";
     const API_BASE = "https://gis-app-ch1.onrender.com"
 
-    const PALETA = ["#2563eb", "#16a34a", "#d97706", "#9333ea", "#dc2626", "#0891b2", "#be185d", "#65a30d"];
+    // Colores del índice de AutoCAD (ACI): rojo, amarillo, verde, cian, magenta, naranja, blanco y azul claro
+    const PALETA = ["#ff0000", "#ffff00", "#00ff00", "#00ffff", "#ff00ff", "#ff7f00", "#ffffff", "#3399ff"];
     const SUFIJOS = ["relleno", "lineas", "puntos"];
+    const $ = id => document.getElementById(id);
 
     const esc = v => String(v).replace(/[&<>"']/g, c =>
       ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -57,8 +305,10 @@
       style: {
         version: 8,
         sources: {
-          osm: { type: "raster", tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-                 tileSize: 256, attribution: "© OpenStreetMap" }
+          osm: {
+            type: "raster", tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+            tileSize: 256, attribution: "© OpenStreetMap"
+          }
         },
         layers: [{ id: "osm", type: "raster", source: "osm" }]
       }
@@ -115,13 +365,21 @@
       const k = item.key, c = item.color, antes = antesDe(item);
       const h = ["boolean", ["feature-state", "hover"], false];
       map.addSource(k, { type: "geojson", data: geojson, generateId: true });
-      map.addLayer({ id: `${k}-relleno`, type: "fill", source: k, filter: ["==", "$type", "Polygon"],
-        paint: { "fill-color": c, "fill-opacity": ["case", h, 0.65, 0.3] } }, antes);
-      map.addLayer({ id: `${k}-lineas`, type: "line", source: k, filter: ["in", "$type", "Polygon", "LineString"],
-        paint: { "line-color": c, "line-width": ["case", h, 3, 1.5] } }, antes);
-      map.addLayer({ id: `${k}-puntos`, type: "circle", source: k, filter: ["==", "$type", "Point"],
-        paint: { "circle-radius": ["case", h, 9, 6], "circle-color": c,
-                 "circle-stroke-width": 2, "circle-stroke-color": "#ffffff" } }, antes);
+      map.addLayer({
+        id: `${k}-relleno`, type: "fill", source: k, filter: ["==", "$type", "Polygon"],
+        paint: { "fill-color": c, "fill-opacity": ["case", h, 0.5, 0.18] }
+      }, antes);
+      map.addLayer({
+        id: `${k}-lineas`, type: "line", source: k, filter: ["in", "$type", "Polygon", "LineString"],
+        paint: { "line-color": c, "line-width": ["case", h, 3, 1.5] }
+      }, antes);
+      map.addLayer({
+        id: `${k}-puntos`, type: "circle", source: k, filter: ["==", "$type", "Point"],
+        paint: {
+          "circle-radius": ["case", h, 7, 4], "circle-color": c,
+          "circle-stroke-width": 1, "circle-stroke-color": "#212121"
+        }
+      }, antes);
     }
 
     async function alternar(item, cb, est) {
@@ -150,6 +408,116 @@
         }
       }
       visible(k, cb.checked);
+    }
+
+    // ---------- Filtro por atributos (un panel desplegable por capa) ----------
+    // Se filtra en el navegador sobre el GeoJSON ya descargado: no hay llamadas extra a la API.
+    const OPS_TXT = [["=", "es igual a"], ["!=", "es distinto de"], ["contiene", "contiene"]];
+    const OPS_NUM = [["=", "="], ["!=", "≠"], [">", ">"], [">=", "≥"], ["<", "<"], ["<=", "≤"]];
+
+    function coincide(v, op, texto) {
+      if (v === null || v === undefined) return false;
+      if (typeof v === "number") {
+        const n = parseFloat(texto.replace(",", "."));
+        if (isNaN(n)) return false;
+        return { "=": v === n, "!=": v !== n, ">": v > n, ">=": v >= n, "<": v < n, "<=": v <= n }[op];
+      }
+      const a = String(v).toLowerCase(), b = texto.toLowerCase();
+      return { "=": a === b, "!=": a !== b, "contiene": a.includes(b) }[op];
+    }
+
+    function construirFiltro(it, caja) {
+      const campo = document.createElement("select");
+      const op = document.createElement("select");
+      const valor = document.createElement("input");
+      const lista = document.createElement("datalist");
+      lista.id = `lista-${it.key}`;
+      valor.setAttribute("list", lista.id);
+      valor.autocomplete = "off";
+      const campoL = document.createElement("label"); campoL.append("Campo", campo);
+      const opL = document.createElement("label"); opL.append("Condición", op);
+      const valorL = document.createElement("label"); valorL.append("Valor", valor);
+      const aplicar = document.createElement("button"); aplicar.textContent = "Aplicar";
+      const limpiar = document.createElement("button"); limpiar.textContent = "Limpiar";
+      const botones = document.createElement("div"); botones.className = "botones";
+      botones.append(aplicar, limpiar);
+      const res = document.createElement("div"); res.className = "res";
+      caja.append(campoL, opL, valorL, lista, botones, res);
+
+      it.tipos = {};
+      it.ui = { campo, op, valor, lista, res };
+      campo.addEventListener("change", () => { llenarOperadores(it); valor.value = ""; llenarValores(it); });
+      aplicar.addEventListener("click", () => aplicarFiltro(it));
+      limpiar.addEventListener("click", () => limpiarFiltro(it));
+      valor.addEventListener("keydown", e => { if (e.key === "Enter") aplicarFiltro(it); });
+    }
+
+    function llenarOperadores(it) {
+      const ops = it.tipos[it.ui.campo.value] === "num" ? OPS_NUM : OPS_TXT;
+      it.ui.op.replaceChildren(...ops.map(([v, t]) => new Option(t, v)));
+    }
+
+    async function llenarValores(it) {
+      const campo = it.ui.campo.value;
+      if (it.tipos[campo] === "num") { it.ui.lista.replaceChildren(); return; }
+      const gj = await obtenerGeoJSON(it);
+      const valores = [...new Set(gj.features.map(f => f.properties[campo])
+        .filter(v => v !== null && v !== undefined).map(String))].sort().slice(0, 200);
+      it.ui.lista.replaceChildren(...valores.map(v => new Option(v)));
+    }
+
+    async function llenarCampos(it) {
+      const gj = await obtenerGeoJSON(it);
+      const muestra = gj.features.slice(0, 300);
+      const claves = new Set();
+      muestra.forEach(f => Object.keys(f.properties).forEach(k => claves.add(k)));
+      it.tipos = {};
+      claves.forEach(c => {
+        const vals = muestra.map(f => f.properties[c]).filter(v => v !== null && v !== undefined);
+        it.tipos[c] = vals.length > 0 && vals.every(v => typeof v === "number") ? "num" : "txt";
+      });
+      it.ui.campo.replaceChildren(...[...claves].map(c => new Option(c, c)));
+      it.ui.campo.value = claves.has(it.column_info) ? it.column_info : [...claves][0];
+      llenarOperadores(it);
+      llenarValores(it);
+    }
+
+    async function aplicarFiltro(it) {
+      const u = it.ui, texto = u.valor.value.trim();
+      if (texto === "") { u.res.textContent = "Escribe un valor para filtrar."; return; }
+      const campo = u.campo.value, op = u.op.value;
+      const gj = await obtenerGeoJSON(it);
+      const filtradas = gj.features.filter(f => coincide(f.properties[campo], op, texto));
+      setHover(null); tooltip.remove();
+      map.getSource(it.key).setData({ type: "FeatureCollection", features: filtradas });
+      it.est.className = "est";
+      it.est.textContent = "filtrada";
+      u.res.textContent = `${filtradas.length} de ${gj.features.length} entidades`;
+      const b = new maplibregl.LngLatBounds();
+      filtradas.forEach(f => extender(f.geometry.coordinates, b));
+      if (!b.isEmpty()) map.fitBounds(b, { padding: 60, maxZoom: 16 });
+    }
+
+    async function limpiarFiltro(it) {
+      if (!map.getSource(it.key)) return;
+      const gj = await obtenerGeoJSON(it);
+      setHover(null); tooltip.remove();
+      map.getSource(it.key).setData(gj);
+      it.est.textContent = "";
+      it.ui.valor.value = "";
+      it.ui.res.textContent = "Filtro quitado";
+    }
+
+    // Abre o cierra el panel de la capa; si la capa aún no se ha cargado, la carga primero
+    async function alternarPanel(it, cb, est, btn, caja) {
+      const abrir = caja.hidden;
+      caja.hidden = !abrir;
+      btn.classList.toggle("abierto", abrir);
+      btn.setAttribute("aria-expanded", String(abrir));
+      if (!abrir || it.camposListos) return;
+      if (!map.getSource(it.key)) { cb.checked = true; await alternar(it, cb, est); }
+      if (map.getSource(it.key)) { await llenarCampos(it); it.camposListos = true; }
+      else it.ui.res.textContent = "No se pudo cargar la capa.";
     }
 
     map.on("mousemove", e => {
@@ -182,14 +550,13 @@
         const res = await fetch(`${API_BASE}/get_lyr_menu`);
         if (!res.ok) throw new Error("La API respondió " + res.status);
         items = await res.json();
-        console.log(items)
       } catch (e) {
         lista.textContent = "No se pudo cargar el menú: " + e.message;
         return;
       }
       lista.textContent = items.length ? "" : "No hay capas activas";
       // Si la fila no tiene zindex, se usa "orden" como respaldo
-      const z = it => it.z_index ?? it.orden ?? 0;
+      const z = it => it.zindex ?? it.orden ?? 0;
       porZ = [...items].sort((a, b) => z(a) - z(b) || a.id - b.id);
 
       items.forEach((it, i) => {
@@ -209,12 +576,30 @@
         nom.textContent = it.capa.replaceAll("_", " ");
         const est = document.createElement("small");
         est.className = "est";
+        it.est = est;
         label.append(cb, sw, nom, est);
-        lista.append(label);
+
+        const btn = document.createElement("button");
+        btn.className = "btn-f";
+        btn.title = "Filtrar por atributos";
+        btn.setAttribute("aria-expanded", "false");
+        btn.innerHTML = '<i class="fa-solid fa-chevron-right"></i>';
+        const fila = document.createElement("div");
+        fila.className = "fila";
+        fila.append(label, btn);
+        const caja = document.createElement("div");
+        caja.className = "filtro";
+        caja.hidden = true;
+        construirFiltro(it, caja);
+        const bloque = document.createElement("div");
+        bloque.append(fila, caja);
+        lista.append(bloque);
+        btn.addEventListener("click", () => alternarPanel(it, cb, est, btn, caja));
 
         cb.addEventListener("change", () => alternar(it, cb, est));
       });
     });
   </script>
 </body>
+
 </html>
