@@ -81,10 +81,7 @@
       const f = map.queryRenderedFeatures(e.point, { layers: idsActivos() })[0];
       if (!f) return;
       const filas = Object.entries(f.properties).map(([k, v]) => `<b>${esc(k)}:</b> ${esc(v)}`).join("<br>");
-      new maplibregl.Popup()
-        .setLngLat(e.lngLat)
-        .setHTML(`<b>${esc(meta[f.source].capa.replaceAll("_", " "))}</b><br>${filas}`)
-        .addTo(map);
+
     });
 
     map.on("load", async () => {
@@ -146,6 +143,8 @@
   <script src="scripts/capas.js"></script>
   <script src="scripts/simbologia.js"></script>
   <script src="scripts/basemaps.js"></script>
+  <script src="scripts/popup.js"></script>
+  <script src="scripts/orden.js"></script>
 </body>
 
 </html>
