@@ -66,6 +66,41 @@
     return tipos[it.key];
   }
 
+  // Opacidad por capa: en polígonos controla el relleno (el contorno queda sólido); en líneas y puntos, todo el trazo
+  const OPACIDAD_RELLENO = 0.18;   // igual al valor inicial que usa agregarCapa
+  function aplicarOpacidad(it, geom) {
+    const o = it.opacidad, k = it.key;
+    if (geom === "Polygon") {
+      const h = ["boolean", ["feature-state", "hover"], false];
+      map.setPaintProperty(`${k}-relleno`, "fill-opacity", ["case", h, Math.min(o + 0.32, 1), o]);
+    } else if (geom === "LineString") {
+      map.setPaintProperty(`${k}-lineas`, "line-opacity", o);
+    } else {
+      map.setPaintProperty(`${k}-puntos`, "circle-opacity", o);
+      map.setPaintProperty(`${k}-puntos`, "circle-stroke-opacity", o);
+    }
+  }
+
+  function controlOpacidad(it, geom) {
+    const o = it.opacidad ?? (geom === "Polygon" ? OPACIDAD_RELLENO : 1);
+    const caja = el("div", "leyenda-op");
+    const r = el("input");
+    r.type = "range";
+    r.min = 0;
+    r.max = 100;
+    r.step = 5;
+    r.value = Math.round(o * 100);
+    r.title = "Opacidad de la capa";
+    const v = el("span", "leyenda-opv", r.value + "%");
+    r.addEventListener("input", () => {
+      it.opacidad = r.value / 100;
+      v.textContent = r.value + "%";
+      aplicarOpacidad(it, geom);
+    });
+    caja.append(el("span", null, geom === "Polygon" ? "Relleno" : "Opacidad"), r, v);
+    return caja;
+  }
+
   const filtrada = it => it.est && it.est.textContent === "filtrada";
 
   class Leyenda {
@@ -133,14 +168,14 @@
         const f = el("div", "leyenda-f");
         f.append(simbolo(geom, sim.color), el("span", "leyenda-n", nombre));
         if (filtrada) f.append(el("small", null, "filtrada"));
-        b.append(f);
+        b.append(f, controlOpacidad(it, geom));
         return b;
       }
 
       const cab = el("div", "leyenda-c");
       cab.append(el("span", "leyenda-n", nombre), el("small", null, sim.campo));
       if (filtrada) cab.append(el("small", null, "· filtrada"));
-      b.append(cab);
+      b.append(cab, controlOpacidad(it, geom));
 
       if (sim.tipo === "cat") {
         it.ocultas = it.ocultas || new Set();

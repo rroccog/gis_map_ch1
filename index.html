@@ -96,7 +96,7 @@
       }
       lista.textContent = items.length ? "" : "No hay capas activas";
       // Si la fila no tiene zindex, se usa "orden" como respaldo
-      const z = it => it.zindex ?? it.orden ?? 0;
+      const z = it => it.z_index ?? it.orden ?? 0;
       porZ = [...items].sort((a, b) => z(a) - z(b) || a.id - b.id);
 
       items.forEach((it, i) => {
@@ -145,6 +145,8 @@
   <script src="scripts/basemaps.js"></script>
   <script src="scripts/popup.js"></script>
   <script src="scripts/orden.js"></script>
+  <script src="scripts/ubicacion.js"></script>
+
 </body>
 
 </html>

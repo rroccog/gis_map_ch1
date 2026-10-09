@@ -7,7 +7,7 @@
 // Los estilos (.grip, .btn-ord, .ord-ayuda...) van en tu archivo CSS (ver orden.css).
 (function () {
   const LLAVE = "orden-dibujo";
-  const z = it => it.zindex ?? it.orden ?? 0;
+  const z = it => it.z_index ?? it.orden ?? 0;
   const lista = document.getElementById("lista");
   const menu = document.getElementById("menu");
 
@@ -49,7 +49,7 @@
   function alSoltar() {
     const porBloque = new Map(items.map(it => [it.bloque, it]));
     const filas = [...lista.children];
-    filas.forEach((b, i) => { porBloque.get(b).zindex = (filas.length - i) * 10; });
+    filas.forEach((b, i) => { porBloque.get(b).z_index = (filas.length - i) * 10; });
     reconstruir();
     aplicarMapa();
     guardar();
@@ -85,7 +85,7 @@
       it.bloque = lista.children[i];
       it.bloque.classList.add("blq");
       it.zOriginal = z(it);
-      if (guardado[it.capa] !== undefined) it.zindex = guardado[it.capa];
+      if (guardado[it.capa] !== undefined) it.z_index = guardado[it.capa];
       const grip = el("span", "grip");
       grip.title = "Arrastrar para cambiar el orden de dibujo";
       grip.innerHTML = '<i class="fa-solid fa-grip-vertical"></i>';
@@ -108,7 +108,7 @@
 
     btn.addEventListener("click", () => { menu.classList.toggle("ordenando"); colocar(); });
     reset.addEventListener("click", () => {
-      items.forEach(it => { it.zindex = it.zOriginal; });
+      items.forEach(it => { it.z_index = it.zOriginal; });
       reconstruir();
       aplicarMapa();
       try { localStorage.removeItem(LLAVE); } catch (e) { /* nada que borrar */ }

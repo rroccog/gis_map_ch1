@@ -266,8 +266,8 @@ body {
   max-height: 40vh;
   overflow-y: auto;
   box-sizing: border-box;
-  border-radius: 4px;
   padding: 8px 10px;
+  border-radius: 4px;
   background: var(--panel);
   color: var(--text);
   box-shadow: 0 0 0 1px #4a4a4a;
@@ -406,13 +406,66 @@ body {
   background: #1a1a1a;
   color: var(--text);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 4px;
   font: 12px system-ui, "Segoe UI", sans-serif;
 }
 
 .leyenda-sel:focus {
   outline: 1px solid var(--accent);
   outline-offset: -1px;
+}
+
+.leyenda-op {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 3px 0 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.leyenda-op input {
+  flex: 1;
+  min-width: 0;
+  height: 14px;
+  margin: 0;
+  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.leyenda-op input::-webkit-slider-runnable-track {
+  height: 2px;
+  background: #4a4a4a;
+}
+
+.leyenda-op input::-moz-range-track {
+  height: 2px;
+  background: #4a4a4a;
+}
+
+.leyenda-op input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  margin-top: -4px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.leyenda-op input::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.leyenda-opv {
+  width: 30px;
+  text-align: right;
 }
 
 /* Control de mapa base */
@@ -618,4 +671,10 @@ body {
 .blq.arrastrando {
   background: #333;
   outline: 1px solid var(--accent);
+}
+
+/* Botón de ubicación: el tema oscuro invierte los íconos; el activo conserva su color azul */
+.maplibregl-ctrl-group button.maplibregl-ctrl-geolocate-active .maplibregl-ctrl-icon,
+.maplibregl-ctrl-group button.maplibregl-ctrl-geolocate-background .maplibregl-ctrl-icon {
+  filter: none;
 }
